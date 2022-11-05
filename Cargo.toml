@@ -5,7 +5,7 @@ name = "red-smv"
 version = "0.1.8"
 
 [dependencies]
-chid = {path = "../chid"}
+chid = {git = "https://github.com/JakeOShannessy/chid.git"}
 data-vector = {git = "https://github.com/JakeOShannessy/data-vector.git", rev = "755d7c879699052ed0c63f79e241339228b6ae00"}
 semver = "1"
 chrono = {version = "0.4", default-features = false}
