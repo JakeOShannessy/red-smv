@@ -1,0 +1,19 @@
+[package]
+authors = ["Jake O'Shannessy <joshannessy@gmail.com>"]
+edition = "2018"
+name = "red-smv"
+version = "0.1.8"
+
+[dependencies]
+chid = {path = "../chid"}
+data-vector = {git = "https://github.com/JakeOShannessy/data-vector.git", rev = "755d7c879699052ed0c63f79e241339228b6ae00"}
+semver = "1"
+chrono = {version = "0.4", default-features = false}
+csv = "1"
+downcast-rs = "1"
+regex = "1"
+serde = {version = "1", features = ["derive"], optional = true}
+
+[features]
+default = ["use_serde"]
+use_serde = ["chid/serde","chrono/serde","serde"]
