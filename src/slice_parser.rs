@@ -9,7 +9,7 @@ pub struct SliceFile {
     pub frames: Vec<Frame>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceHeader {
     pub quantity: String,
     pub short_name: String,
@@ -23,7 +23,7 @@ pub struct Frame {
     pub values: Vec<f32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dimensions {
     pub i_min: u32,
     pub i_max: u32,

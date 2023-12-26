@@ -2,7 +2,7 @@
 authors = ["Jake O'Shannessy <joshannessy@gmail.com>"]
 edition = "2018"
 name = "red-smv"
-version = "0.1.8"
+version = "0.1.10"
 
 [dependencies]
 chid = {git = "https://github.com/JakeOShannessy/chid.git", rev = "21cb4c1c99120e3cab25a6150ba35e103c3242c1"}

@@ -157,7 +157,7 @@ pub struct SmvFile {
 }
 
 impl SmvFile {
-    pub fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let smv_file = std::fs::File::open(path)?;
         let smv_data = parse_smv_file(smv_file)?;
         Ok(smv_data)
@@ -167,7 +167,7 @@ impl SmvFile {
 pub type SurfIndex = u64;
 
 /// The surface indices for each side of the obst.
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd)]
 pub struct Surfaces {
     pub min_x: SurfIndex,
     pub max_x: SurfIndex,
@@ -510,10 +510,14 @@ impl FromStr for ObstFirstHalf {
         let s_min_z: u64 = values.next().ok_or(())?.parse().unwrap();
         let s_max_z: u64 = values.next().ok_or(())?.parse().unwrap();
         let texture_origin = if let Some(s) = values.next() {
-            let x: f64 = s.parse().unwrap();
-            let y: f64 = values.next().ok_or(())?.parse().unwrap();
-            let z: f64 = values.next().ok_or(())?.parse().unwrap();
-            Some(Xyz::new(x, y, z))
+            if s == "!" {
+                None
+            } else {
+                let x: f64 = s.parse().unwrap();
+                let y: f64 = values.next().ok_or(())?.parse().unwrap();
+                let z: f64 = values.next().ok_or(())?.parse().unwrap();
+                Some(Xyz::new(x, y, z))
+            }
         } else {
             None
         };
@@ -533,7 +537,7 @@ impl FromStr for ObstFirstHalf {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct ObstSecondHalf {
     pub ijk: GridRegion,
     pub color_index: i64,
@@ -842,7 +846,7 @@ pub fn parse_smv_file<R: Read>(input: R) -> Result<SmvFile, Box<dyn std::error::
                 if line.starts_with(|c: char| c.is_whitespace()) {
                     continue;
                 }
-                let (name, remainder) = if let Some(n) = (&line).find(|c: char| c.is_whitespace()) {
+                let (name, remainder) = if let Some(n) = line.find(|c: char| c.is_whitespace()) {
                     line.split_at(n)
                 } else {
                     (line.deref(), "")
@@ -922,11 +926,24 @@ pub fn parse_smv_file<R: Read>(input: R) -> Result<SmvFile, Box<dyn std::error::
                         state = ParserState::CVent;
                     }
                     "SMOKF3D" => {
-                        let n = remainder.trim().parse().unwrap();
+                        // eprintln!(">{remainder}<");
+                        let n = remainder
+                            .trim()
+                            .split_ascii_whitespace()
+                            .next()
+                            .unwrap()
+                            .parse()
+                            .unwrap();
                         state = ParserState::Smoke3d1(Smoke3dType::F, n);
                     }
                     "SMOKG3D" => {
-                        let n = remainder.trim().parse().unwrap();
+                        let n = remainder
+                            .trim()
+                            .split_ascii_whitespace()
+                            .next()
+                            .unwrap()
+                            .parse()
+                            .unwrap();
                         state = ParserState::Smoke3d1(Smoke3dType::G, n);
                     }
                     "SLCC" => {

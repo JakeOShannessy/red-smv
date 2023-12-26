@@ -3,7 +3,7 @@ use csv;
 use data_vector::{DataVector, Point};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{io::Read, path::Path};
 
 #[derive(Clone)]
 pub enum GetCsvDataError {
@@ -24,7 +24,7 @@ impl std::fmt::Debug for GetCsvDataError {
 
 impl std::error::Error for GetCsvDataError {}
 
-#[derive(Clone, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum SmvValue {
     Float(f64),
@@ -67,29 +67,34 @@ downcast_rs::impl_downcast!(SmvVec);
 /// From this struct we can produce iterators over values which are then
 /// streamed from the file. When we are iterating over a vector from this csv
 /// file, it will be parsed one line at a time.
-pub struct CsvDataFile {
-    file: std::fs::File,
+pub struct CsvDataFile<R> {
+    rdr: csv::Reader<R>,
     units: Vec<String>,
     names: Vec<String>,
 }
 
-impl CsvDataFile {
+impl CsvDataFile<std::fs::File> {
     pub fn from_file(path: &Path) -> std::io::Result<Self> {
-        let mut file = std::fs::File::open(path)?;
+        let file = std::fs::File::open(path)?;
+        Self::from_reader(file)
+    }
+}
+
+impl<R: Read> CsvDataFile<R> {
+    pub fn from_reader(reader: R) -> std::io::Result<Self> {
         let mut rdr = csv::ReaderBuilder::new()
             .has_headers(false)
             .trim(csv::Trim::All)
-            .from_reader(&mut file);
-
-        let mut rdr: csv::DeserializeRecordsIter<'_, _, Vec<String>> = rdr.deserialize();
-
-        let units_line = rdr.next().unwrap().unwrap().into_iter();
-        let units: Vec<String> = units_line.collect();
-
-        let names_line = rdr.next().unwrap().unwrap().into_iter();
-        let names: Vec<String> = names_line.collect();
-
-        Ok(Self { file, units, names })
+            .from_reader(reader);
+        let (units, names) = {
+            let mut rdr: csv::DeserializeRecordsIter<'_, R, Vec<String>> = rdr.deserialize();
+            let units_line = rdr.next().unwrap().unwrap().into_iter();
+            let units: Vec<String> = units_line.collect();
+            let names_line = rdr.next().unwrap().unwrap().into_iter();
+            let names: Vec<String> = names_line.collect();
+            (units, names)
+        };
+        Ok(Self { rdr, units, names })
     }
 }
 
@@ -166,40 +171,29 @@ impl CsvDataBlock {
     }
 
     pub fn from_file(csv_path: &Path) -> Result<CsvDataBlock, Box<dyn std::error::Error>> {
-        let csv_file = std::fs::File::open(&csv_path)?;
+        let csv_file = CsvDataFile::from_file(csv_path)?;
+        Self::from_csv_file(csv_file)
+    }
 
-        // First we need to trim the first line from the csv
-        // We start with a single byte buffer. This is a little hacky but it
-        // works
+    pub fn from_reader<R: Read>(reader: R) -> Result<CsvDataBlock, Box<dyn std::error::Error>> {
+        let csv_file = CsvDataFile::from_reader(reader)?;
+        Self::from_csv_file(csv_file)
+    }
 
-        // let mut csv_contents = String::new();
-        // file.read_to_string(&mut contents).unwrap();
-        // Build the CSV reader and iterate over each record.
-
-        let mut rdr = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .trim(csv::Trim::All)
-            .from_reader(csv_file);
-
-        let mut rdr: csv::DeserializeRecordsIter<'_, std::fs::File, Vec<String>> =
-            rdr.deserialize();
-
-        let units_line = rdr.next().unwrap().unwrap().into_iter();
-        let units: Vec<String> = units_line.collect();
-
-        let names_line = rdr.next().unwrap().unwrap().into_iter();
-        let names: Vec<String> = names_line.collect();
-        let mut values = Vec::with_capacity(names.len());
-        values.resize(names.len(), Vec::new());
-        for result in rdr {
+    pub fn from_csv_file<R: Read>(
+        mut csv_file: CsvDataFile<R>,
+    ) -> Result<CsvDataBlock, Box<dyn std::error::Error>> {
+        let mut values = Vec::with_capacity(csv_file.names.len());
+        values.resize(csv_file.names.len(), Vec::new());
+        for result in csv_file.rdr.deserialize() {
             // The iterator yields Result<StringRecord, Error>, so we check the
             // error here.
             let record: Vec<String> = result?;
             let record_iter = record.into_iter();
             for (((entry, vec), units), name) in record_iter
                 .zip(values.iter_mut())
-                .zip(units.iter())
-                .zip(names.iter())
+                .zip(csv_file.units.iter())
+                .zip(csv_file.names.iter())
             {
                 // Currently, we only support vectors of floats. We want to support
                 // dates and ctrls as well. In particular dates at the moment.
@@ -218,8 +212,8 @@ impl CsvDataBlock {
             }
         }
         Ok(CsvDataBlock {
-            units,
-            names,
+            units: csv_file.units,
+            names: csv_file.names,
             values,
         })
     }
