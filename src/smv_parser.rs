@@ -54,7 +54,7 @@ pub type GridCoord = i64;
 pub type Coord = f64;
 
 /// A sextuple of grid coordinates representing a region of cells.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd)]
 pub struct GridRegion {
     pub i1: GridCoord,
     pub i2: GridCoord,
